@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_sensors/flutter_sensors.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:gal/gal.dart';
 import 'gallery_screen.dart';
 
 class CameraScreen extends StatefulWidget {
@@ -12,23 +13,35 @@ class CameraScreen extends StatefulWidget {
 }
 
 class _CameraScreenState extends State<CameraScreen> {
-  late CameraController _controller;
-  late List<CameraDescription> cameras;
+  CameraController? _controller;
+  List<CameraDescription> cameras = [];
   double magneticStrength = 0.0;
+  List<double> magneticHistory = [];
   bool showFlash = false;
 
   @override
   void initState() {
     super.initState();
-    initCamera();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      initCamera();
+    });
+
     initMagnetometer();
   }
 
   Future<void> initCamera() async {
-    cameras = await availableCameras();
-    _controller = CameraController(cameras[0], ResolutionPreset.high);
-    await _controller.initialize();
-    setState(() {});
+    try {
+      cameras = await availableCameras();
+      _controller = CameraController(cameras[0], ResolutionPreset.high);
+      await _controller!.initialize();
+      setState(() {});
+    } catch (e) {
+      print('Erreur caméra : $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur lors de l’accès à la caméra')),
+      );
+    }
   }
 
   void initMagnetometer() async {
@@ -45,11 +58,25 @@ class _CameraScreenState extends State<CameraScreen> {
         final x = event.data[0];
         final y = event.data[1];
         final z = event.data[2];
+        final strength = sqrt(x * x + y * y + z * z);
+
+        magneticHistory.add(strength);
+        if (magneticHistory.length > 10) {
+          magneticHistory.removeAt(0);
+        }
+
+        final average = magneticHistory.reduce((a, b) => a + b) / magneticHistory.length;
+
         setState(() {
-          magneticStrength = sqrt(x * x + y * y + z * z);
+          magneticStrength = average;
         });
       });
     }
+  }
+
+  bool isMagneticStable() {
+    if (magneticHistory.length < 10) return false;
+    return magneticHistory.every((v) => (v - magneticStrength).abs() < 2);
   }
 
   void triggerFlash() {
@@ -60,16 +87,35 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> capturePhoto() async {
-    if (!_controller.value.isInitialized) return;
-    triggerFlash();
-    final image = await _controller.takePicture();
-    final dir = await getApplicationDocumentsDirectory();
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    await File(image.path).copy('${dir.path}/photo_$timestamp.jpg');
+    if (_controller == null || !_controller!.value.isInitialized || _controller!.value.isTakingPicture) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('📸 Photo enregistrée')),
-    );
+    if (!isMagneticStable()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Champ magnétique instable 📡')),
+      );
+      return;
+    }
+
+    try {
+      triggerFlash();
+      final image = await _controller!.takePicture();
+      final dir = await getApplicationDocumentsDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final savedPath = '${dir.path}/photo_$timestamp.jpg';
+      await File(image.path).copy(savedPath);
+
+      // ✅ Enregistrement dans la galerie iOS
+      await Gal.putImage(savedPath);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('📸 Photo enregistrée dans la galerie')),
+      );
+    } catch (e) {
+      print('Erreur capture : $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur lors de la capture')),
+      );
+    }
   }
 
   @override
@@ -77,8 +123,8 @@ class _CameraScreenState extends State<CameraScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          _controller.value.isInitialized
-              ? CameraPreview(_controller)
+          (_controller != null && _controller!.value.isInitialized)
+              ? CameraPreview(_controller!)
               : Center(child: CircularProgressIndicator()),
 
           if (showFlash)
@@ -118,10 +164,10 @@ class _CameraScreenState extends State<CameraScreen> {
                   "Champ magnétique : ${magneticStrength.toStringAsFixed(2)} µT",
                   style: TextStyle(color: Colors.white),
                 ),
-                if (magneticStrength > 100)
+                if (!isMagneticStable())
                   Text(
-                    "⚠️ Aimant détecté ! Risque de flou.",
-                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                    "⚠️ Instabilité magnétique détectée",
+                    style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
                   ),
               ],
             ),

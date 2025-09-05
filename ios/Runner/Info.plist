@@ -45,5 +45,12 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>CamFix XR a besoin d’enregistrer des photos dans votre galerie</string>
+	<key>NSCameraUsageDescription</key>
+	<string>CamFix XR utilise la caméra pour capturer des photos</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>CamFix XR utilise le micro pour enregistrer des vidéos</string>
+
 </dict>
 </plist>
