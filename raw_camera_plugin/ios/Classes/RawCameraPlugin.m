@@ -1,11 +1,13 @@
 #import "RawCameraPlugin.h"
 #import <AVFoundation/AVFoundation.h>
+#import <UIKit/UIKit.h>
 
-@interface RawCameraPlugin () <FlutterPlugin, AVCapturePhotoCaptureDelegate>
+@interface RawCameraPlugin () <FlutterPlugin, AVCaptureVideoDataOutputSampleBufferDelegate>
 @property(nonatomic, strong) AVCaptureSession *session;
 @property(nonatomic, strong) AVCaptureDeviceInput *input;
-@property(nonatomic, strong) AVCapturePhotoOutput *output;
+@property(nonatomic, strong) AVCaptureVideoDataOutput *videoOutput;
 @property(nonatomic, strong) FlutterResult resultCallback;
+@property(nonatomic, assign) BOOL hasCaptured;
 @end
 
 @implementation RawCameraPlugin
@@ -19,56 +21,58 @@
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
-  if ([@"captureRawPhoto" isEqualToString:call.method]) {
+  if ([@"captureFrameWithoutOIS" isEqualToString:call.method]) {
     self.resultCallback = result;
-    [self setupCameraAndCapture];
+    self.hasCaptured = NO;
+    [self setupVideoCapture];
   } else {
     result(FlutterMethodNotImplemented);
   }
 }
 
-- (void)setupCameraAndCapture {
-  if (self.session.isRunning) {
-    [self.session stopRunning];
-  }
-
+- (void)setupVideoCapture {
   self.session = [[AVCaptureSession alloc] init];
+  self.session.sessionPreset = AVCaptureSessionPresetHigh;
+
   AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
   NSError *error = nil;
   self.input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
-  self.output = [[AVCapturePhotoOutput alloc] init];
 
   if ([self.session canAddInput:self.input]) {
     [self.session addInput:self.input];
   }
-  if ([self.session canAddOutput:self.output]) {
-    [self.session addOutput:self.output];
+
+  self.videoOutput = [[AVCaptureVideoDataOutput alloc] init];
+  self.videoOutput.alwaysDiscardsLateVideoFrames = YES;
+  [self.videoOutput setSampleBufferDelegate:self queue:dispatch_get_main_queue()];
+
+  if ([self.session canAddOutput:self.videoOutput]) {
+    [self.session addOutput:self.videoOutput];
   }
 
   [self.session startRunning];
-
-  if (self.output.availableRawPhotoPixelFormatTypes.count > 0) {
-    NSNumber *rawFormat = self.output.availableRawPhotoPixelFormatTypes.firstObject;
-    AVCapturePhotoSettings *settings = [AVCapturePhotoSettings photoSettingsWithRawPixelFormatType:rawFormat.intValue];
-    settings.flashMode = AVCaptureFlashModeOff;
-    settings.highResolutionPhotoEnabled = YES;
-    [self.output capturePhotoWithSettings:settings delegate:self];
-  } else {
-    self.resultCallback([FlutterError errorWithCode:@"RAW_UNAVAILABLE" message:@"RAW format non disponible" details:nil]);
-  }
 }
 
-- (void)captureOutput:(AVCapturePhotoOutput *)output
-didFinishProcessingPhoto:(AVCapturePhoto *)photo
-               error:(nullable NSError *)error {
-  if (error) {
-    self.resultCallback([FlutterError errorWithCode:@"CAPTURE_ERROR" message:error.localizedDescription details:nil]);
-    return;
-  }
+- (void)captureOutput:(AVCaptureOutput *)output
+didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
+       fromConnection:(AVCaptureConnection *)connection {
 
-  NSData *rawData = photo.fileDataRepresentation;
-  NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:@"photo.dng"];
-  [rawData writeToFile:path atomically:YES];
+  if (self.hasCaptured) return;
+  self.hasCaptured = YES;
+
+  CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+  CIImage *ciImage = [CIImage imageWithCVPixelBuffer:imageBuffer];
+  CIContext *context = [CIContext contextWithOptions:nil];
+  CGImageRef cgImage = [context createCGImage:ciImage fromRect:ciImage.extent];
+
+  UIImage *image = [UIImage imageWithCGImage:cgImage];
+  CGImageRelease(cgImage);
+
+  NSData *imageData = UIImageJPEGRepresentation(image, 1.0);
+  NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:@"frame.jpg"];
+  [imageData writeToFile:path atomically:YES];
+
+  [self.session stopRunning];
   self.resultCallback(path);
 }
 @end
