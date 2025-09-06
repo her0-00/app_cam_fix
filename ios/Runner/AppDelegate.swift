@@ -13,42 +13,34 @@ import AVFoundation
     let channel = FlutterMethodChannel(name: "camfixxr/camera", binaryMessenger: controller.binaryMessenger)
 
     channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
-      if call.method == "configure240FPS" {
+      if call.method == "disableStabilization" {
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
           result(FlutterError(code: "CAMERA_ERROR", message: "Caméra non disponible", details: nil))
           return
         }
 
-        do {
-          var bestFormat: AVCaptureDevice.Format?
-          var bestRange: AVFrameRateRange?
+        let session = AVCaptureSession()
+        session.beginConfiguration()
 
-          for format in device.formats {
-            for range in format.videoSupportedFrameRateRanges {
-              if Int(range.maxFrameRate) == 240 {
-                bestFormat = format
-                bestRange = range
-                break
-              }
-            }
-            if bestFormat != nil { break }
-          }
-
-          guard let format = bestFormat, let range = bestRange else {
-            result(FlutterError(code: "FPS_UNSUPPORTED", message: "240 FPS non pris en charge", details: nil))
-            return
-          }
-
-          try device.lockForConfiguration()
-          device.activeFormat = format
-          device.activeVideoMinFrameDuration = range.minFrameDuration
-          device.activeVideoMaxFrameDuration = range.minFrameDuration
-          device.automaticallyAdjustsVideoHDREnabled = false
-          device.unlockForConfiguration()
-          result("✅ Caméra configurée à 240 FPS")
-        } catch {
-          result(FlutterError(code: "CONFIG_ERROR", message: "Impossible de configurer la caméra", details: nil))
+        guard let input = try? AVCaptureDeviceInput(device: device),
+              session.canAddInput(input) else {
+          result(FlutterError(code: "SESSION_ERROR", message: "Impossible d’ajouter l’entrée", details: nil))
+          return
         }
+
+        session.addInput(input)
+
+        let output = AVCaptureVideoDataOutput()
+        if session.canAddOutput(output) {
+          session.addOutput(output)
+        }
+
+        if let connection = output.connection(with: .video) {
+          connection.preferredVideoStabilizationMode = .off // ✅ Désactive EIS
+        }
+
+        session.commitConfiguration()
+        result("✅ Stabilisation logicielle désactivée")
       } else {
         result(FlutterMethodNotImplemented)
       }

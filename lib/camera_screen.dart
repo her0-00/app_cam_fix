@@ -16,16 +16,16 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   void initState() {
     super.initState();
-    _configureCamera(); // ⚙️ Configure 240 FPS au démarrage
+    _disableStabilization(); // ⚙️ Désactive la stabilisation logicielle
   }
 
-  Future<void> _configureCamera() async {
+  Future<void> _disableStabilization() async {
     const platform = MethodChannel('camfixxr/camera');
     try {
-      await platform.invokeMethod('configure240FPS');
-      print('✅ Caméra configurée à 240 FPS');
+      await platform.invokeMethod('disableStabilization');
+      print('✅ Stabilisation logicielle désactivée');
     } catch (e) {
-      print('Erreur configuration caméra : $e');
+      print('Erreur désactivation stabilisation : $e');
     }
   }
 
