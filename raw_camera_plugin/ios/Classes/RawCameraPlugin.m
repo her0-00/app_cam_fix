@@ -1,4 +1,4 @@
-#import "RawCameraPlugin.h"
+#import "RawCameraPluginObjC.h"
 #import <AVFoundation/AVFoundation.h>
 
 @interface RawCameraPlugin () <FlutterPlugin, AVCapturePhotoCaptureDelegate>
