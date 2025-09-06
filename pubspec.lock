@@ -395,6 +395,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.0.3"
+  raw_camera_plugin:
+    dependency: "direct main"
+    description:
+      path: raw_camera_plugin
+      relative: true
+    source: path
+    version: "0.0.1"
   rxdart:
     dependency: transitive
     description:
@@ -481,5 +488,5 @@ packages:
     source: hosted
     version: "6.6.1"
 sdks:
-  dart: ">=3.8.1 <4.0.0"
+  dart: ">=3.9.2 <4.0.0"
   flutter: ">=3.32.8"

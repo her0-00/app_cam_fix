@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:gal/gal.dart';
 import 'package:flutter/services.dart';
@@ -11,44 +10,40 @@ class CameraScreen extends StatefulWidget {
 }
 
 class _CameraScreenState extends State<CameraScreen> {
-  File? _capturedImage;
-  String _cameraStatus = "⏳ Configuration en cours...";
+  File? _capturedRawImage;
+  String _cameraStatus = "⏳ Mode RAW en attente...";
 
   @override
   void initState() {
     super.initState();
-    _activateRealSpaceMode();
+    _cameraStatus = "📷 Appuie pour capturer en RAW";
   }
 
-  Future<void> _activateRealSpaceMode() async {
-    const platform = MethodChannel('camfixxr/camera');
+  Future<void> _captureRawPhoto() async {
+    const platform = MethodChannel('raw_camera_plugin');
     try {
-      final result = await platform.invokeMethod('activateRealSpaceMode');
-      setState(() => _cameraStatus = "✅ Mode brut actif");
-      print(result);
+      final path = await platform.invokeMethod<String>('captureRawPhoto');
+      if (path != null) {
+        final rawFile = File(path);
+        final dir = await getApplicationDocumentsDirectory();
+        final savedPath = '${dir.path}/photo_raw_${DateTime.now().millisecondsSinceEpoch}.dng';
+        final savedFile = await rawFile.copy(savedPath);
+        await Gal.putImage(savedFile.path); // Enregistre dans la galerie
+        setState(() {
+          _capturedRawImage = savedFile;
+          _cameraStatus = "✅ Photo RAW enregistrée";
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('📸 Photo RAW enregistrée dans la galerie')),
+        );
+      } else {
+        setState(() => _cameraStatus = "⚠️ Aucun fichier reçu");
+      }
     } catch (e) {
-      setState(() => _cameraStatus = "⚠️ Échec configuration brut");
-      print('Erreur : $e');
-    }
-  }
-
-  Future<void> _takePhoto() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.camera);
-
-    if (pickedFile != null) {
-      final imageFile = File(pickedFile.path);
-      final dir = await getApplicationDocumentsDirectory();
-      final savedPath = '${dir.path}/photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final savedFile = await imageFile.copy(savedPath);
-      await Gal.putImage(savedFile.path);
-      setState(() => _capturedImage = savedFile);
+      setState(() => _cameraStatus = "❌ Erreur RAW");
+      print('Erreur RAW : $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('📸 Photo enregistrée dans la galerie')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('⚠️ Aucune photo capturée')),
+        SnackBar(content: Text('❌ Erreur lors de la capture RAW')),
       );
     }
   }
@@ -57,23 +52,24 @@ class _CameraScreenState extends State<CameraScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(title: Text('CamFix XR'), backgroundColor: Colors.redAccent),
+      appBar: AppBar(title: Text('CamFix XR — RAW Mode'), backgroundColor: Colors.redAccent),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(_cameraStatus, style: TextStyle(color: Colors.greenAccent, fontSize: 16)),
             SizedBox(height: 20),
-            _capturedImage != null
-                ? Image.file(_capturedImage!)
-                : Text('Appuie sur le bouton pour capturer une image',
+            _capturedRawImage != null
+                ? Text('📂 Fichier RAW : ${_capturedRawImage!.path}',
+                    style: TextStyle(color: Colors.white, fontSize: 14), textAlign: TextAlign.center)
+                : Text('Appuie sur le bouton pour capturer une image RAW',
                     style: TextStyle(color: Colors.white, fontSize: 18), textAlign: TextAlign.center),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.redAccent,
-        onPressed: _takePhoto,
+        onPressed: _captureRawPhoto,
         child: Icon(Icons.camera_alt),
       ),
     );

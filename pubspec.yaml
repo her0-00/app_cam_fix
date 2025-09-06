@@ -1,3 +1,4 @@
+publish_to: none
 name: camfix_xr
 description: Une app Flutter pour stabiliser les photos et détecter les champs magnétiques.
 version: 1.0.0+1
@@ -8,14 +9,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  raw_camera_plugin:
+    path: ./raw_camera_plugin
   camera: ^0.11.2
   gal: ^2.0.0
   image_picker: ^1.0.7
   flutter_sensors: ^1.0.0
   path_provider: ^2.0.11
   camerawesome: ^2.0.0-dev
-
-
+ 
 flutter:
   assets:
     - assets/images/logo.png
