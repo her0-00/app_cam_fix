@@ -24,7 +24,7 @@ import AVFoundation
           device.activeVideoMinFrameDuration = CMTimeMake(value: 1, timescale: 15) // 15 FPS
           device.activeVideoMaxFrameDuration = CMTimeMake(value: 1, timescale: 15)
           device.automaticallyAdjustsVideoHDREnabled = false
-          device.automaticallyAdjustsVideoStabilizationMode = false
+          // ❌ Supprimé : device.automaticallyAdjustsVideoStabilizationMode
           device.unlockForConfiguration()
           result("Configuration appliquée")
         } catch {
