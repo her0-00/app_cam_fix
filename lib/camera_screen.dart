@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:gal/gal.dart';
-import 'gallery_screen.dart';
+import 'package:flutter/services.dart';
 
 class CameraScreen extends StatefulWidget {
   @override
@@ -13,6 +13,21 @@ class CameraScreen extends StatefulWidget {
 class _CameraScreenState extends State<CameraScreen> {
   File? _capturedImage;
 
+  @override
+  void initState() {
+    super.initState();
+    _configureIOSCamera(); // 🔧 Appel natif iOS
+  }
+
+  Future<void> _configureIOSCamera() async {
+    const platform = MethodChannel('camfixxr/camera');
+    try {
+      await platform.invokeMethod('configureCamera');
+    } catch (e) {
+      print('Erreur configuration iOS : $e');
+    }
+  }
+
   Future<void> _takePhoto() async {
     try {
       final picker = ImagePicker();
@@ -20,32 +35,25 @@ class _CameraScreenState extends State<CameraScreen> {
 
       if (pickedFile != null) {
         final imageFile = File(pickedFile.path);
-
-        // 📁 Sauvegarde locale
         final dir = await getApplicationDocumentsDirectory();
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final savedPath = '${dir.path}/photo_$timestamp.jpg';
-        await imageFile.copy(savedPath);
-
-        // 🖼️ Enregistrement dans la galerie iOS
-        await Gal.putImage(savedPath);
-
-        setState(() {
-          _capturedImage = File(savedPath);
-        });
+        final savedFile = await imageFile.copy(savedPath);
+        await Gal.putImage(savedFile.path);
+        setState(() => _capturedImage = savedFile);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('📸 Photo enregistrée dans la galerie')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Aucune photo capturée')),
+          SnackBar(content: Text('⚠️ Aucune photo capturée')),
         );
       }
     } catch (e) {
-      print('Erreur capture : $e');
+      print('Erreur lors de la capture : $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de la capture')),
+        SnackBar(content: Text('❌ Erreur pendant la capture')),
       );
     }
   }
@@ -63,26 +71,10 @@ class _CameraScreenState extends State<CameraScreen> {
                 textAlign: TextAlign.center,
               ),
       ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            backgroundColor: Colors.redAccent,
-            onPressed: _takePhoto,
-            child: Icon(Icons.camera_alt),
-          ),
-          SizedBox(height: 20),
-          FloatingActionButton(
-            backgroundColor: Colors.blueGrey,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => GalleryScreen()),
-              );
-            },
-            child: Icon(Icons.photo_library),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.redAccent,
+        onPressed: _takePhoto,
+        child: Icon(Icons.camera_alt),
       ),
     );
   }
