@@ -1,20 +1,20 @@
-#import "RawCameraPluginObjC.h"
+#import "RawCameraPlugin.h"
 #import <AVFoundation/AVFoundation.h>
 
-@interface RawCameraPluginObjC () <FlutterPlugin, AVCapturePhotoCaptureDelegate>
+@interface RawCameraPlugin () <FlutterPlugin, AVCapturePhotoCaptureDelegate>
 @property(nonatomic, strong) AVCaptureSession *session;
 @property(nonatomic, strong) AVCaptureDeviceInput *input;
 @property(nonatomic, strong) AVCapturePhotoOutput *output;
 @property(nonatomic, strong) FlutterResult resultCallback;
 @end
 
-@implementation RawCameraPluginObjC
+@implementation RawCameraPlugin
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
   FlutterMethodChannel* channel = [FlutterMethodChannel
       methodChannelWithName:@"raw_camera_plugin"
             binaryMessenger:[registrar messenger]];
-  RawCameraPluginObjC* instance = [[RawCameraPluginObjC alloc] init];
+  RawCameraPlugin* instance = [[RawCameraPlugin alloc] init];
   [registrar addMethodCallDelegate:instance channel:channel];
 }
 
