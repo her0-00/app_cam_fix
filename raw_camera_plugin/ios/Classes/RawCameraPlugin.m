@@ -28,6 +28,10 @@
 }
 
 - (void)setupCameraAndCapture {
+  if (self.session.isRunning) {
+    [self.session stopRunning];
+  }
+
   self.session = [[AVCaptureSession alloc] init];
   AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
   NSError *error = nil;

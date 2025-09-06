@@ -10,7 +10,7 @@ Capture d’image RAW via AVCapturePhotoOutput en Objective-C.
   s.author           = { 'Yenam' => 'yenam@example.com' }
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*.{h,m}'
-  s.public_header_files = 'Classes/RawCameraPluginObjC.h'
+  s.public_header_files = 'Classes/RawCameraPlugin.h'
   s.dependency       'Flutter'
   s.platform         = :ios, '13.0'
   s.swift_version    = nil
