@@ -13,7 +13,7 @@ import AVFoundation
     let channel = FlutterMethodChannel(name: "camfixxr/camera", binaryMessenger: controller.binaryMessenger)
 
     channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
-      if call.method == "disableStabilization" {
+      if call.method == "activateRawMode" {
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
           result(FlutterError(code: "CAMERA_ERROR", message: "Caméra non disponible", details: nil))
           return
@@ -36,11 +36,20 @@ import AVFoundation
         }
 
         if let connection = output.connection(with: .video) {
-          connection.preferredVideoStabilizationMode = .off // ✅ Désactive EIS
+          connection.preferredVideoStabilizationMode = .off // ❌ EIS désactivée
+        }
+
+        do {
+          try device.lockForConfiguration()
+          device.automaticallyAdjustsVideoHDREnabled = false // ❌ HDR désactivé
+          device.unlockForConfiguration()
+        } catch {
+          result(FlutterError(code: "CONFIG_ERROR", message: "Impossible de configurer la caméra", details: nil))
+          return
         }
 
         session.commitConfiguration()
-        result("✅ Stabilisation logicielle désactivée")
+        result("✅ Mode brut activé")
       } else {
         result(FlutterMethodNotImplemented)
       }

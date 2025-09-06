@@ -16,45 +16,36 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   void initState() {
     super.initState();
-    _disableStabilization(); // ⚙️ Désactive la stabilisation logicielle
+    _activateRawMode(); // ⚙️ Mode brut au démarrage
   }
 
-  Future<void> _disableStabilization() async {
+  Future<void> _activateRawMode() async {
     const platform = MethodChannel('camfixxr/camera');
     try {
-      await platform.invokeMethod('disableStabilization');
-      print('✅ Stabilisation logicielle désactivée');
+      await platform.invokeMethod('activateRawMode');
+      print('✅ Mode brut activé');
     } catch (e) {
-      print('Erreur désactivation stabilisation : $e');
+      print('Erreur activation mode brut : $e');
     }
   }
 
   Future<void> _takePhoto() async {
-    try {
-      final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(source: ImageSource.camera);
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.camera);
 
-      if (pickedFile != null) {
-        final imageFile = File(pickedFile.path);
-        final dir = await getApplicationDocumentsDirectory();
-        final timestamp = DateTime.now().millisecondsSinceEpoch;
-        final savedPath = '${dir.path}/photo_$timestamp.jpg';
-        final savedFile = await imageFile.copy(savedPath);
-        await Gal.putImage(savedFile.path);
-        setState(() => _capturedImage = savedFile);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('📸 Photo enregistrée dans la galerie')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('⚠️ Aucune photo capturée')),
-        );
-      }
-    } catch (e) {
-      print('Erreur lors de la capture : $e');
+    if (pickedFile != null) {
+      final imageFile = File(pickedFile.path);
+      final dir = await getApplicationDocumentsDirectory();
+      final savedPath = '${dir.path}/photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final savedFile = await imageFile.copy(savedPath);
+      await Gal.putImage(savedFile.path);
+      setState(() => _capturedImage = savedFile);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Erreur pendant la capture')),
+        SnackBar(content: Text('📸 Photo enregistrée dans la galerie')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('⚠️ Aucune photo capturée')),
       );
     }
   }
@@ -63,18 +54,12 @@ class _CameraScreenState extends State<CameraScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: Text('CamFix XR'),
-        backgroundColor: Colors.redAccent,
-      ),
+      appBar: AppBar(title: Text('CamFix XR'), backgroundColor: Colors.redAccent),
       body: Center(
         child: _capturedImage != null
             ? Image.file(_capturedImage!)
-            : Text(
-                'Appuie sur le bouton pour capturer une image',
-                style: TextStyle(color: Colors.white, fontSize: 18),
-                textAlign: TextAlign.center,
-              ),
+            : Text('Appuie sur le bouton pour capturer une image',
+                style: TextStyle(color: Colors.white, fontSize: 18), textAlign: TextAlign.center),
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.redAccent,
