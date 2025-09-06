@@ -12,7 +12,12 @@ import AVFoundation
     let controller: FlutterViewController = window?.rootViewController as! FlutterViewController
     let channel = FlutterMethodChannel(name: "camfixxr/camera", binaryMessenger: controller.binaryMessenger)
 
-    channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
+    channel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
+      guard let self = self else {
+        result(FlutterError(code: "SELF_ERROR", message: "Référence perdue", details: nil))
+        return
+      }
+
       if call.method == "activateRealSpaceMode" {
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
           result(FlutterError(code: "CAMERA_ERROR", message: "Caméra non disponible", details: nil))
@@ -20,7 +25,7 @@ import AVFoundation
         }
 
         do {
-          let (format, range) = try selectNeutralFormat(device: device)
+          let (format, range) = try self.selectNeutralFormat(device: device)
 
           try device.lockForConfiguration()
           device.activeFormat = format
