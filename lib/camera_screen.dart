@@ -24,23 +24,36 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen> {
   File? _capturedImage;
-  String _cameraStatus = "📷 Appuie pour capturer sans stabilisation";
+  String _cameraStatus = "🔄 Préparation du capteur…";
+  bool _isSensorReady = false;
 
-  Future<void> _captureFrameWithoutOIS() async {
+  @override
+  void initState() {
+    super.initState();
+    RawCameraPlugin.setSensorReadyHandler(() {
+      setState(() {
+        _isSensorReady = true;
+        _cameraStatus = "📷 Capteur prêt — tu peux capturer";
+      });
+    });
+    RawCameraPlugin.captureHighQualityPhoto(); // Lance la préparation
+  }
+
+  Future<void> _captureHighQualityPhoto() async {
     try {
-      final path = await RawCameraPlugin.captureFrameWithoutOIS();
+      final path = await RawCameraPlugin.captureHighQualityPhoto();
       if (path != null) {
         final imageFile = File(path);
         final dir = await getApplicationDocumentsDirectory();
-        final savedPath = '${dir.path}/frame_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final savedPath = '${dir.path}/photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final savedFile = await imageFile.copy(savedPath);
         await Gal.putImage(savedFile.path);
         setState(() {
           _capturedImage = savedFile;
-          _cameraStatus = "✅ Image enregistrée sans OIS";
+          _cameraStatus = "✅ Photo enregistrée";
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('📸 Image enregistrée dans la galerie')),
+          SnackBar(content: Text('📸 Photo enregistrée dans la galerie')),
         );
       } else {
         setState(() => _cameraStatus = "⚠️ Aucun fichier reçu");
@@ -58,7 +71,7 @@ class _CameraScreenState extends State<CameraScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(title: Text('CamFix XR — Sans Stabilisation'), backgroundColor: Colors.redAccent),
+      appBar: AppBar(title: Text('CamFix XR — Haute Qualité'), backgroundColor: Colors.redAccent),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -74,14 +87,14 @@ class _CameraScreenState extends State<CameraScreen> {
                           style: TextStyle(color: Colors.white, fontSize: 14), textAlign: TextAlign.center),
                     ],
                   )
-                : Text('Appuie sur le bouton pour capturer une image sans stabilisation',
+                : Text('Appuie sur le bouton une fois le capteur prêt',
                     style: TextStyle(color: Colors.white, fontSize: 18), textAlign: TextAlign.center),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.redAccent,
-        onPressed: _captureFrameWithoutOIS,
+        backgroundColor: _isSensorReady ? Colors.redAccent : Colors.grey,
+        onPressed: _isSensorReady ? _captureHighQualityPhoto : null,
         child: Icon(Icons.camera_alt),
       ),
     );

@@ -2,13 +2,13 @@
 #import <AVFoundation/AVFoundation.h>
 #import <UIKit/UIKit.h>
 
-@interface RawCameraPlugin () <FlutterPlugin, AVCaptureVideoDataOutputSampleBufferDelegate>
+@interface RawCameraPlugin () <FlutterPlugin, AVCapturePhotoCaptureDelegate>
 @property(nonatomic, strong) AVCaptureSession *session;
 @property(nonatomic, strong) AVCaptureDeviceInput *input;
-@property(nonatomic, strong) AVCaptureVideoDataOutput *videoOutput;
+@property(nonatomic, strong) AVCapturePhotoOutput *photoOutput;
 @property(nonatomic, strong) FlutterResult resultCallback;
-@property(nonatomic, assign) BOOL hasCaptured;
-@property(nonatomic, assign) int frameCount;
+@property(nonatomic, strong) AVCaptureDevice *device;
+@property(nonatomic, strong) FlutterMethodChannel *channel;
 @end
 
 @implementation RawCameraPlugin
@@ -18,105 +18,69 @@
       methodChannelWithName:@"raw_camera_plugin"
             binaryMessenger:[registrar messenger]];
   RawCameraPlugin* instance = [[RawCameraPlugin alloc] init];
+  instance.channel = channel;
   [registrar addMethodCallDelegate:instance channel:channel];
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
-  if ([@"captureFrameWithoutOIS" isEqualToString:call.method]) {
+  if ([@"captureHighQualityPhoto" isEqualToString:call.method]) {
     self.resultCallback = result;
-    self.hasCaptured = NO;
-    self.frameCount = 0;
-    [self setupVideoCapture];
+    [self setupCameraAndCapture];
   } else {
     result(FlutterMethodNotImplemented);
   }
 }
 
-- (void)setupVideoCapture {
+- (void)setupCameraAndCapture {
   self.session = [[AVCaptureSession alloc] init];
-  self.session.sessionPreset = AVCaptureSessionPresetHigh;
+  self.session.sessionPreset = AVCaptureSessionPresetPhoto;
 
-  AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+  self.device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
   NSError *error = nil;
-  self.input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
+  self.input = [AVCaptureDeviceInput deviceInputWithDevice:self.device error:&error];
+  self.photoOutput = [[AVCapturePhotoOutput alloc] init];
 
   if ([self.session canAddInput:self.input]) {
     [self.session addInput:self.input];
   }
-
-  // 🔧 Autofocus au centre
-  if ([device isFocusModeSupported:AVCaptureFocusModeAutoFocus]) {
-    [device lockForConfiguration:nil];
-    [device setFocusMode:AVCaptureFocusModeAutoFocus];
-    [device setFocusPointOfInterest:CGPointMake(0.5, 0.5)];
-    [device unlockForConfiguration];
-  }
-
-  self.videoOutput = [[AVCaptureVideoDataOutput alloc] init];
-  self.videoOutput.alwaysDiscardsLateVideoFrames = YES;
-  [self.videoOutput setSampleBufferDelegate:self queue:dispatch_get_main_queue()];
-
-  if ([self.session canAddOutput:self.videoOutput]) {
-    [self.session addOutput:self.videoOutput];
+  if ([self.session canAddOutput:self.photoOutput]) {
+    [self.session addOutput:self.photoOutput];
   }
 
   [self.session startRunning];
+
+  // 🔍 Mise au point au centre
+  if ([self.device isFocusModeSupported:AVCaptureFocusModeAutoFocus]) {
+    [self.device lockForConfiguration:nil];
+    [self.device setFocusMode:AVCaptureFocusModeAutoFocus];
+    [self.device setFocusPointOfInterest:CGPointMake(0.5, 0.5)];
+    [self.device unlockForConfiguration];
+  }
+
+  // ✅ Attendre que le capteur soit prêt
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    [self.channel invokeMethod:@"sensorReady" arguments:nil];
+  });
 }
 
-- (void)captureOutput:(AVCaptureOutput *)output
-didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
-       fromConnection:(AVCaptureConnection *)connection {
+- (void)capturePhoto {
+  AVCapturePhotoSettings *settings = [AVCapturePhotoSettings photoSettings];
+  settings.highResolutionPhotoEnabled = YES;
+  settings.flashMode = AVCaptureFlashModeAuto;
+  [self.photoOutput capturePhotoWithSettings:settings delegate:self];
+}
 
-  self.frameCount++;
-  if (self.frameCount < 15 || self.hasCaptured) return;
-  self.hasCaptured = YES;
-
-  CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
-  CIImage *ciImage = [CIImage imageWithCVPixelBuffer:imageBuffer];
-
-  // 🔧 Filtre de netteté
-  CIFilter *sharpenFilter = [CIFilter filterWithName:@"CISharpenLuminance"];
-  [sharpenFilter setValue:ciImage forKey:kCIInputImageKey];
-  [sharpenFilter setValue:@(0.8) forKey:@"inputSharpness"];
-  CIImage *sharpenedImage = sharpenFilter.outputImage;
-
-  CIContext *context = [CIContext contextWithOptions:nil];
-  CGImageRef cgImage = [context createCGImage:sharpenedImage fromRect:sharpenedImage.extent];
-
-  if (!cgImage) {
-    self.resultCallback([FlutterError errorWithCode:@"IMAGE_ERROR" message:@"Image non extraite" details:nil]);
+- (void)captureOutput:(AVCapturePhotoOutput *)output
+didFinishProcessingPhoto:(AVCapturePhoto *)photo
+               error:(nullable NSError *)error {
+  if (error) {
+    self.resultCallback([FlutterError errorWithCode:@"CAPTURE_ERROR" message:error.localizedDescription details:nil]);
     return;
   }
 
-  // 🔧 Orientation dynamique
-  UIDeviceOrientation deviceOrientation = [[UIDevice currentDevice] orientation];
-  UIImageOrientation imageOrientation;
-
-  switch (deviceOrientation) {
-    case UIDeviceOrientationPortrait:
-      imageOrientation = UIImageOrientationRight;
-      break;
-    case UIDeviceOrientationLandscapeLeft:
-      imageOrientation = UIImageOrientationUp;
-      break;
-    case UIDeviceOrientationLandscapeRight:
-      imageOrientation = UIImageOrientationDown;
-      break;
-    case UIDeviceOrientationPortraitUpsideDown:
-      imageOrientation = UIImageOrientationLeft;
-      break;
-    default:
-      imageOrientation = UIImageOrientationRight;
-      break;
-  }
-
-  UIImage *image = [UIImage imageWithCGImage:cgImage scale:1.0 orientation:imageOrientation];
-  CGImageRelease(cgImage);
-
-  NSData *imageData = UIImageJPEGRepresentation(image, 1.0);
-  NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:@"frame.jpg"];
+  NSData *imageData = [photo fileDataRepresentation];
+  NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:@"photo.jpg"];
   [imageData writeToFile:path atomically:YES];
-
   [self.session stopRunning];
   self.resultCallback(path);
 }
