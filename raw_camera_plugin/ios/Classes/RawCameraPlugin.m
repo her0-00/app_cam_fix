@@ -44,6 +44,14 @@
     [self.session addInput:self.input];
   }
 
+  // 🔧 Autofocus au centre
+  if ([device isFocusModeSupported:AVCaptureFocusModeAutoFocus]) {
+    [device lockForConfiguration:nil];
+    [device setFocusMode:AVCaptureFocusModeAutoFocus];
+    [device setFocusPointOfInterest:CGPointMake(0.5, 0.5)];
+    [device unlockForConfiguration];
+  }
+
   self.videoOutput = [[AVCaptureVideoDataOutput alloc] init];
   self.videoOutput.alwaysDiscardsLateVideoFrames = YES;
   [self.videoOutput setSampleBufferDelegate:self queue:dispatch_get_main_queue()];
@@ -60,19 +68,27 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
        fromConnection:(AVCaptureConnection *)connection {
 
   self.frameCount++;
-  if (self.frameCount < 5 || self.hasCaptured) return;
+  if (self.frameCount < 15 || self.hasCaptured) return;
   self.hasCaptured = YES;
 
   CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
   CIImage *ciImage = [CIImage imageWithCVPixelBuffer:imageBuffer];
+
+  // 🔧 Filtre de netteté
+  CIFilter *sharpenFilter = [CIFilter filterWithName:@"CISharpenLuminance"];
+  [sharpenFilter setValue:ciImage forKey:kCIInputImageKey];
+  [sharpenFilter setValue:@(0.8) forKey:@"inputSharpness"];
+  CIImage *sharpenedImage = sharpenFilter.outputImage;
+
   CIContext *context = [CIContext contextWithOptions:nil];
-  CGImageRef cgImage = [context createCGImage:ciImage fromRect:ciImage.extent];
+  CGImageRef cgImage = [context createCGImage:sharpenedImage fromRect:sharpenedImage.extent];
 
   if (!cgImage) {
     self.resultCallback([FlutterError errorWithCode:@"IMAGE_ERROR" message:@"Image non extraite" details:nil]);
     return;
   }
 
+  // 🔧 Orientation dynamique
   UIDeviceOrientation deviceOrientation = [[UIDevice currentDevice] orientation];
   UIImageOrientation imageOrientation;
 
