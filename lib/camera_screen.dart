@@ -12,36 +12,20 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen> {
   File? _capturedImage;
-  int _selectedFPS = 30;
-  bool _isStabilized = true;
 
   @override
   void initState() {
     super.initState();
-    _setCameraFPS(_selectedFPS);
-    _setStabilization(_isStabilized);
+    _configureCamera(); // ⚙️ Configure 240 FPS au démarrage
   }
 
-  Future<void> _setCameraFPS(int fps) async {
+  Future<void> _configureCamera() async {
     const platform = MethodChannel('camfixxr/camera');
     try {
-      await platform.invokeMethod('setFPS', {'fps': fps});
-      print('✅ FPS réglé sur $fps');
+      await platform.invokeMethod('configure240FPS');
+      print('✅ Caméra configurée à 240 FPS');
     } catch (e) {
-      print('Erreur configuration FPS : $e');
-    }
-  }
-
-  Future<void> _setStabilization(bool enabled) async {
-    const platform = MethodChannel('camfixxr/camera');
-    try {
-      await platform.invokeMethod('setStabilization', {'enabled': enabled});
-      setState(() => _isStabilized = enabled);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(enabled ? '🎯 Stabilisation activée' : '🚫 Stabilisation désactivée')),
-      );
-    } catch (e) {
-      print('Erreur stabilisation : $e');
+      print('Erreur configuration caméra : $e');
     }
   }
 
@@ -82,30 +66,6 @@ class _CameraScreenState extends State<CameraScreen> {
       appBar: AppBar(
         title: Text('CamFix XR'),
         backgroundColor: Colors.redAccent,
-        actions: [
-          DropdownButton<int>(
-            value: _selectedFPS,
-            dropdownColor: Colors.black,
-            iconEnabledColor: Colors.white,
-            items:  [15, 30, 60,90,140,180,200,240,280].map((fps) {
-              return DropdownMenuItem(
-                value: fps,
-                child: Text('$fps FPS', style: TextStyle(color: Colors.white)),
-              );
-            }).toList(),
-            onChanged: (fps) {
-              if (fps != null) {
-                setState(() => _selectedFPS = fps);
-                _setCameraFPS(fps);
-              }
-            },
-          ),
-          Switch(
-            value: _isStabilized,
-            onChanged: (value) => _setStabilization(value),
-            activeColor: Colors.greenAccent,
-          ),
-        ],
       ),
       body: Center(
         child: _capturedImage != null

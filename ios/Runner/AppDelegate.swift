@@ -13,63 +13,43 @@ import AVFoundation
     let channel = FlutterMethodChannel(name: "camfixxr/camera", binaryMessenger: controller.binaryMessenger)
 
     channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
-      guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
-        result(FlutterError(code: "CAMERA_ERROR", message: "Caméra non disponible", details: nil))
-        return
-      }
-
-      if call.method == "setFPS" {
-        guard let args = call.arguments as? [String: Any],
-              let fps = args["fps"] as? Int else {
-          result(FlutterError(code: "ARG_ERROR", message: "FPS manquant", details: nil))
+      if call.method == "configure240FPS" {
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
+          result(FlutterError(code: "CAMERA_ERROR", message: "Caméra non disponible", details: nil))
           return
         }
 
         do {
+          var bestFormat: AVCaptureDevice.Format?
+          var bestRange: AVFrameRateRange?
+
+          for format in device.formats {
+            for range in format.videoSupportedFrameRateRanges {
+              if Int(range.maxFrameRate) == 240 {
+                bestFormat = format
+                bestRange = range
+                break
+              }
+            }
+            if bestFormat != nil { break }
+          }
+
+          guard let format = bestFormat, let range = bestRange else {
+            result(FlutterError(code: "FPS_UNSUPPORTED", message: "240 FPS non pris en charge", details: nil))
+            return
+          }
+
           try device.lockForConfiguration()
-          let frameDuration = CMTimeMake(value: 1, timescale: Int32(fps))
-          device.activeVideoMinFrameDuration = frameDuration
-          device.activeVideoMaxFrameDuration = frameDuration
+          device.activeFormat = format
+          device.activeVideoMinFrameDuration = range.minFrameDuration
+          device.activeVideoMaxFrameDuration = range.minFrameDuration
           device.automaticallyAdjustsVideoHDREnabled = false
           device.unlockForConfiguration()
-          result("FPS réglé sur \(fps)")
+          result("✅ Caméra configurée à 240 FPS")
         } catch {
           result(FlutterError(code: "CONFIG_ERROR", message: "Impossible de configurer la caméra", details: nil))
         }
-      }
-
-      else if call.method == "setStabilization" {
-        guard let args = call.arguments as? [String: Any],
-              let enabled = args["enabled"] as? Bool else {
-          result(FlutterError(code: "ARG_ERROR", message: "Paramètre manquant", details: nil))
-          return
-        }
-
-        let session = AVCaptureSession()
-        session.beginConfiguration()
-
-        guard let input = try? AVCaptureDeviceInput(device: device),
-              session.canAddInput(input) else {
-          result(FlutterError(code: "SESSION_ERROR", message: "Impossible d’ajouter l’entrée", details: nil))
-          return
-        }
-
-        session.addInput(input)
-
-        let output = AVCaptureVideoDataOutput()
-        if session.canAddOutput(output) {
-          session.addOutput(output)
-        }
-
-        if let connection = output.connection(with: .video) {
-          connection.preferredVideoStabilizationMode = enabled ? .standard : .off
-        }
-
-        session.commitConfiguration()
-        result("Stabilisation \(enabled ? "activée" : "désactivée")")
-      }
-
-      else {
+      } else {
         result(FlutterMethodNotImplemented)
       }
     }
