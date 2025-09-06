@@ -8,13 +8,14 @@
 @property(nonatomic, strong) FlutterResult resultCallback;
 @end
 
-@implementation RawCameraPlugin
+@implementation RawCameraPluginObjC
+
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
   FlutterMethodChannel* channel = [FlutterMethodChannel
       methodChannelWithName:@"raw_camera_plugin"
             binaryMessenger:[registrar messenger]];
-  RawCameraPlugin* instance = [[RawCameraPlugin alloc] init];
+  RawCameraPluginObjC* instance = [[RawCameraPluginObjC alloc] init];
   [registrar addMethodCallDelegate:instance channel:channel];
 }
 
