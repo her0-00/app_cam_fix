@@ -12,20 +12,23 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen> {
   File? _capturedImage;
+  String _cameraStatus = "⏳ Configuration en cours...";
 
   @override
   void initState() {
     super.initState();
-    _activateRawMode(); // ⚙️ Mode brut au démarrage
+    _activateRealSpaceMode();
   }
 
-  Future<void> _activateRawMode() async {
+  Future<void> _activateRealSpaceMode() async {
     const platform = MethodChannel('camfixxr/camera');
     try {
-      await platform.invokeMethod('activateRawMode');
-      print('✅ Mode brut activé');
+      final result = await platform.invokeMethod('activateRealSpaceMode');
+      setState(() => _cameraStatus = "✅ Mode brut actif");
+      print(result);
     } catch (e) {
-      print('Erreur activation mode brut : $e');
+      setState(() => _cameraStatus = "⚠️ Échec configuration brut");
+      print('Erreur : $e');
     }
   }
 
@@ -56,10 +59,17 @@ class _CameraScreenState extends State<CameraScreen> {
       backgroundColor: Colors.black,
       appBar: AppBar(title: Text('CamFix XR'), backgroundColor: Colors.redAccent),
       body: Center(
-        child: _capturedImage != null
-            ? Image.file(_capturedImage!)
-            : Text('Appuie sur le bouton pour capturer une image',
-                style: TextStyle(color: Colors.white, fontSize: 18), textAlign: TextAlign.center),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(_cameraStatus, style: TextStyle(color: Colors.greenAccent, fontSize: 16)),
+            SizedBox(height: 20),
+            _capturedImage != null
+                ? Image.file(_capturedImage!)
+                : Text('Appuie sur le bouton pour capturer une image',
+                    style: TextStyle(color: Colors.white, fontSize: 18), textAlign: TextAlign.center),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.redAccent,
