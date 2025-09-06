@@ -73,7 +73,28 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     return;
   }
 
-  UIImage *image = [UIImage imageWithCGImage:cgImage];
+  UIDeviceOrientation deviceOrientation = [[UIDevice currentDevice] orientation];
+  UIImageOrientation imageOrientation;
+
+  switch (deviceOrientation) {
+    case UIDeviceOrientationPortrait:
+      imageOrientation = UIImageOrientationRight;
+      break;
+    case UIDeviceOrientationLandscapeLeft:
+      imageOrientation = UIImageOrientationUp;
+      break;
+    case UIDeviceOrientationLandscapeRight:
+      imageOrientation = UIImageOrientationDown;
+      break;
+    case UIDeviceOrientationPortraitUpsideDown:
+      imageOrientation = UIImageOrientationLeft;
+      break;
+    default:
+      imageOrientation = UIImageOrientationRight;
+      break;
+  }
+
+  UIImage *image = [UIImage imageWithCGImage:cgImage scale:1.0 orientation:imageOrientation];
   CGImageRelease(cgImage);
 
   NSData *imageData = UIImageJPEGRepresentation(image, 1.0);

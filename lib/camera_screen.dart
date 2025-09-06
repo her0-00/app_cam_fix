@@ -24,13 +24,7 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen> {
   File? _capturedImage;
-  String _cameraStatus = "⏳ Initialisation...";
-
-  @override
-  void initState() {
-    super.initState();
-    _cameraStatus = "📷 Appuie pour capturer sans stabilisation";
-  }
+  String _cameraStatus = "📷 Appuie pour capturer sans stabilisation";
 
   Future<void> _captureFrameWithoutOIS() async {
     try {
