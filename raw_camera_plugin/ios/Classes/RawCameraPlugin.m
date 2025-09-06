@@ -8,6 +8,7 @@
 @property(nonatomic, strong) AVCaptureVideoDataOutput *videoOutput;
 @property(nonatomic, strong) FlutterResult resultCallback;
 @property(nonatomic, assign) BOOL hasCaptured;
+@property(nonatomic, assign) int frameCount;
 @end
 
 @implementation RawCameraPlugin
@@ -24,6 +25,7 @@
   if ([@"captureFrameWithoutOIS" isEqualToString:call.method]) {
     self.resultCallback = result;
     self.hasCaptured = NO;
+    self.frameCount = 0;
     [self setupVideoCapture];
   } else {
     result(FlutterMethodNotImplemented);
@@ -57,13 +59,19 @@
 didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
        fromConnection:(AVCaptureConnection *)connection {
 
-  if (self.hasCaptured) return;
+  self.frameCount++;
+  if (self.frameCount < 5 || self.hasCaptured) return;
   self.hasCaptured = YES;
 
   CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
   CIImage *ciImage = [CIImage imageWithCVPixelBuffer:imageBuffer];
   CIContext *context = [CIContext contextWithOptions:nil];
   CGImageRef cgImage = [context createCGImage:ciImage fromRect:ciImage.extent];
+
+  if (!cgImage) {
+    self.resultCallback([FlutterError errorWithCode:@"IMAGE_ERROR" message:@"Image non extraite" details:nil]);
+    return;
+  }
 
   UIImage *image = [UIImage imageWithCGImage:cgImage];
   CGImageRelease(cgImage);

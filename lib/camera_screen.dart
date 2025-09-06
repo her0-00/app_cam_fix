@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:gal/gal.dart';
-import 'package:flutter/services.dart';
+import 'package:raw_camera_plugin/raw_camera_plugin.dart';
 
 void main() => runApp(CamFixXRApp());
 
@@ -33,15 +33,14 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _captureFrameWithoutOIS() async {
-    const platform = MethodChannel('raw_camera_plugin');
     try {
-      final path = await platform.invokeMethod<String>('captureFrameWithoutOIS');
+      final path = await RawCameraPlugin.captureFrameWithoutOIS();
       if (path != null) {
         final imageFile = File(path);
         final dir = await getApplicationDocumentsDirectory();
         final savedPath = '${dir.path}/frame_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final savedFile = await imageFile.copy(savedPath);
-        await Gal.putImage(savedFile.path); // Enregistre dans la galerie
+        await Gal.putImage(savedFile.path);
         setState(() {
           _capturedImage = savedFile;
           _cameraStatus = "✅ Image enregistrée sans OIS";
