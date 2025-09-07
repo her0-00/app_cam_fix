@@ -1,101 +1,72 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:gal/gal.dart';
 import 'package:raw_camera_plugin/raw_camera_plugin.dart';
-
-void main() => runApp(CamFixXRApp());
-
-class CamFixXRApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'CamFix XR',
-      theme: ThemeData.dark(),
-      home: CameraScreen(),
-    );
-  }
-}
+import 'package:gal/gal.dart';
 
 class CameraScreen extends StatefulWidget {
+  const CameraScreen({super.key});
+
   @override
-  _CameraScreenState createState() => _CameraScreenState();
+  State<CameraScreen> createState() => _CameraScreenState();
 }
 
 class _CameraScreenState extends State<CameraScreen> {
   File? _capturedImage;
-  String _cameraStatus = "🔄 Préparation du capteur…";
-  bool _isSensorReady = false;
+  String _status = "🎥 Prévisualisation en cours...";
 
   @override
   void initState() {
     super.initState();
-    RawCameraPlugin.setSensorReadyHandler(() {
+    RawCameraPlugin.setRawPhotoCapturedHandler((path) async {
+      final file = File(path);
+      await Gal.putImage(path);
       setState(() {
-        _isSensorReady = true;
-        _cameraStatus = "📷 Capteur prêt — tu peux capturer";
+        _capturedImage = file;
+        _status = "✅ Frame capturée et enregistrée";
       });
     });
-    RawCameraPlugin.captureHighQualityPhoto(); // Lance la préparation
   }
 
-  Future<void> _captureHighQualityPhoto() async {
-    try {
-      final path = await RawCameraPlugin.captureHighQualityPhoto();
-      if (path != null) {
-        final imageFile = File(path);
-        final dir = await getApplicationDocumentsDirectory();
-        final savedPath = '${dir.path}/photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final savedFile = await imageFile.copy(savedPath);
-        await Gal.putImage(savedFile.path);
-        setState(() {
-          _capturedImage = savedFile;
-          _cameraStatus = "✅ Photo enregistrée";
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('📸 Photo enregistrée dans la galerie')),
-        );
-      } else {
-        setState(() => _cameraStatus = "⚠️ Aucun fichier reçu");
-      }
-    } catch (e) {
-      setState(() => _cameraStatus = "❌ Erreur lors de la capture");
-      print('Erreur : $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Erreur lors de la capture')),
-      );
-    }
+  Future<void> _captureRawPhoto() async {
+    setState(() => _status = "📸 Capture en cours...");
+    await RawCameraPlugin.captureRawPhoto();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(title: Text('CamFix XR — Haute Qualité'), backgroundColor: Colors.redAccent),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(_cameraStatus, style: TextStyle(color: Colors.greenAccent, fontSize: 16)),
-            SizedBox(height: 20),
-            _capturedImage != null
-                ? Column(
-                    children: [
-                      Image.file(_capturedImage!, height: 200),
-                      SizedBox(height: 10),
-                      Text('📂 Fichier : ${_capturedImage!.path}',
-                          style: TextStyle(color: Colors.white, fontSize: 14), textAlign: TextAlign.center),
-                    ],
-                  )
-                : Text('Appuie sur le bouton une fois le capteur prêt',
-                    style: TextStyle(color: Colors.white, fontSize: 18), textAlign: TextAlign.center),
-          ],
-        ),
+      appBar: AppBar(
+        title: const Text('CamFix XR — Capture RAW'),
+        backgroundColor: Colors.redAccent,
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: _isSensorReady ? Colors.redAccent : Colors.grey,
-        onPressed: _isSensorReady ? _captureHighQualityPhoto : null,
-        child: Icon(Icons.camera_alt),
+      body: Column(
+        children: [
+          const Expanded(child: RawCameraPreview()),
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Text(_status, style: const TextStyle(color: Colors.greenAccent)),
+          ),
+          if (_capturedImage != null)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Image.file(_capturedImage!, height: 200),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: ElevatedButton.icon(
+              onPressed: _captureRawPhoto,
+              icon: const Icon(Icons.camera_alt),
+              label: const Text("Capturer cette frame"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

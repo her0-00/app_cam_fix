@@ -1,24 +1,30 @@
 import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
 
 class RawCameraPlugin {
   static const MethodChannel _channel = MethodChannel('raw_camera_plugin');
 
-  static Future<String?> captureHighQualityPhoto() async {
-    final String? path = await _channel.invokeMethod('captureHighQualityPhoto');
-    return path;
+  static Future<void> captureRawPhoto() async {
+    await _channel.invokeMethod('captureRawPhoto');
   }
 
-  static void setSensorReadyHandler(Function() onReady) {
+  static void setRawPhotoCapturedHandler(Function(String path) onCaptured) {
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'sensorReady') {
-        onReady();
+      if (call.method == 'rawPhotoCaptured') {
+        onCaptured(call.arguments as String);
       }
     });
   }
+}
 
-    /// Optionnel : récupérer la version de la plateforme
-  static Future<String?> getPlatformVersion() async {
-    final String? version = await _channel.invokeMethod('getPlatformVersion');
-    return version;
+class RawCameraPreview extends StatelessWidget {
+  const RawCameraPreview({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const UiKitView(
+      viewType: 'raw_camera_plugin',
+      layoutDirection: TextDirection.ltr,
+    );
   }
 }
